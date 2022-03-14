@@ -19,7 +19,8 @@ public class EmrService {
     AwsCredentialsProvider credentialsProvider = DefaultCredentialsProvider.create();
     @Builder.Default
     List<StepConfig> steps = new ArrayList<>();
-    RunJobFlowResponse runJobFlowResponse;
+    String jobFlowId;
+    String flowName;
 
     public static EmrService create() {
         return builder().build();
@@ -33,7 +34,7 @@ public class EmrService {
                 .build();
     }
 
-    public void addStep(String stepName, String jar, String mainClass, String ... args) {
+    public void addStep(String stepName, String jar, String mainClass, String... args) {
         // Add a Hadoop step config to be executed on EMR
         steps.add(
                 StepConfig.builder()
@@ -50,14 +51,16 @@ public class EmrService {
         );
     }
 
-    public void runFlow(int instanceCount, String flowName, String logUri) {
+    public String runFlow(int instanceCount, String name, String logUri) {
         // Run the flow on EMR
+        flowName = name;
+
         RunJobFlowResponse runJobFlowResponse = emr.runJobFlow(
                 RunJobFlowRequest.builder()
                         .name(flowName)
                         .logUri(logUri)
                         .steps(steps)
-//                        TODO: Purge steps after completion
+                        //                        TODO: Purge steps after completion
                         .instances(
                                 JobFlowInstancesConfig.builder()
                                         .instanceCount(instanceCount)
@@ -73,10 +76,63 @@ public class EmrService {
                         .serviceRole("EMR_DefaultRole")
                         .build()
         );
-        String jobFlowId = runJobFlowResponse.jobFlowId();
-        System.out.println("Running the following job flow: %s with the following id: %d" + flowName + jobFlowId);
+        jobFlowId = runJobFlowResponse.jobFlowId();
+        System.out.println("Submitted EMR job: %s with the following id: %d" + flowName + jobFlowId);
         System.out.println("Running the following steps:");
         steps.forEach(step -> System.out.println(step.name() + '\n'));
+        jobFlowId = runJobFlowResponse.jobFlowId();
+        return waitForCompletion();
+
+    }
+
+    public String waitForCompletion() {
+        // Wait for the flow to complete
+//        TODO: cleanup
+        System.out.println("Waiting for the job flow to complete: %s with the following id: %d" + flowName + jobFlowId);
+        while (true) {
+
+            ClusterState state = ClusterState.STARTING;
+            ClusterStatus status = getClusterStatus(jobFlowId);
+            ClusterState newState = status.state();
+            if (!state.equals(newState)) {
+                System.out.println("Cluster id %s switched from %s to %s. Reason: %s." +
+                        jobFlowId + state + newState + status.stateChangeReason());
+                state = newState;
+            }
+            if (state.equals(ClusterState.TERMINATED)) {
+                System.out.println("Job flow completed successfully");
+                return jobFlowId;
+            }
+            if (state.equals(ClusterState.TERMINATED_WITH_ERRORS)) {
+                System.out.println("Job flow completed with errors");
+                return null;
+            }
+            switch (state.toString()) {
+                case "TERMINATED":
+                    System.out.println("Job flow completed successfully");
+                    return jobFlowId;
+                case "TERMINATED_WITH_ERRORS":
+                    System.out.println("Job flow completed with errors");
+                    return null;
+                default:
+            }
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public ClusterState getJobState(String jobFlowId) {
+        return getClusterStatus(jobFlowId).state();
+    }
+
+    public ClusterStatus getClusterStatus(String jobFlowId) {
+        DescribeClusterRequest clusterRequest =
+                DescribeClusterRequest.builder().clusterId(jobFlowId).build();
+        DescribeClusterResponse clusterResponse = emr.describeCluster(clusterRequest);
+        return clusterResponse.cluster().status();
     }
 
 }
