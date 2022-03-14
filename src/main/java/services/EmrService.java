@@ -1,3 +1,5 @@
+package services;
+
 import lombok.Builder;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;

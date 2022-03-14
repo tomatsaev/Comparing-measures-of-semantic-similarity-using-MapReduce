@@ -1,3 +1,5 @@
+package services;
+
 import lombok.Builder;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
@@ -9,6 +11,7 @@ import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.core.waiters.WaiterResponse;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Utilities;
 import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.services.s3.waiters.S3Waiter;
 
@@ -46,7 +49,7 @@ public class S3Service {
         try {
             bucketName = (name + "-" + credentialsProvider.resolveCredentials().accessKeyId()).toLowerCase();
             S3Waiter s3Waiter = s3.waiter();
-            var bucketRequest = CreateBucketRequest.builder()
+            CreateBucketRequest bucketRequest = CreateBucketRequest.builder()
                     .bucket(bucketName)
                     .createBucketConfiguration(
                             CreateBucketConfiguration.builder()
@@ -54,7 +57,7 @@ public class S3Service {
                     .build();
 
             s3.createBucket(bucketRequest);
-            var bucketRequestWait = HeadBucketRequest.builder()
+            HeadBucketRequest bucketRequestWait = HeadBucketRequest.builder()
                     .bucket(bucketName)
                     .build();
 
@@ -100,7 +103,7 @@ public class S3Service {
     }
 
     public void deleteEmptyBucket(String bucketName) {
-        var deleteBucketRequest = DeleteBucketRequest.builder()
+        DeleteBucketRequest deleteBucketRequest = DeleteBucketRequest.builder()
                 .bucket(bucketName)
                 .build();
         try {
@@ -116,8 +119,8 @@ public class S3Service {
     }
 
     public List<Bucket> getAllBuckets() {
-        var listBucketsRequest = ListBucketsRequest.builder().build();
-        var listBucketsResponse = s3.listBuckets(listBucketsRequest);
+        ListBucketsRequest listBucketsRequest = ListBucketsRequest.builder().build();
+        ListBucketsResponse listBucketsResponse = s3.listBuckets(listBucketsRequest);
         return listBucketsResponse.buckets();
     }
 
@@ -154,6 +157,7 @@ public class S3Service {
 
     public void saveFile(String bucketName, String keyName, String newFileName) {
         File file = new File(newFileName);
+        //noinspection ResultOfMethodCallIgnored
         file.delete();
 
         GetObjectRequest getObjectRequest = GetObjectRequest.builder()
@@ -192,7 +196,7 @@ public class S3Service {
     public List<String> ListBucketObjects(String bucketName) {
         String keyName;
 
-        var keys = new ArrayList<String>();
+        ArrayList<String> keys = new ArrayList<>();
 
         try {
             ListObjectsRequest listObjects = ListObjectsRequest
@@ -259,8 +263,8 @@ public class S3Service {
     }
 
     public URL getUrl(String bucketName, String key) {
-        var utilities = s3.utilities();
-        var request = GetUrlRequest.builder()
+        S3Utilities utilities = s3.utilities();
+        GetUrlRequest request = GetUrlRequest.builder()
                 .bucket(bucketName)
                 .key(key)
                 .build();
